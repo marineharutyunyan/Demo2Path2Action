@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { venues } from "@/data/venues";
-import { MAPBOX_CONFIG } from "@/config/openai";
 
 
 interface VenueMapProps {
@@ -11,16 +10,39 @@ interface VenueMapProps {
   language: "en" | "arm";
 }
 
+// Cookie utility functions
+function setCookie(name: string, value: string, days = 365) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + expires + '; path=/';
+}
+function getCookie(name: string) {
+  return document.cookie.split('; ').reduce((r, v) => {
+    const parts = v.split('=');
+    return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+  }, '');
+}
+
 export const VenueMap = ({ hoveredVenueId, onMarkerHover, language }: VenueMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<Map<number, mapboxgl.Marker>>(new Map());
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    // Check for token in cookies or prompt user
+    let token = getCookie('mapboxToken');
+    if (!token) {
+      token = window.prompt('Please enter your Mapbox public token:') || '';
+      if (token) setCookie('mapboxToken', token);
+    }
+    setMapboxToken(token || null);
+  }, []);
 
-    mapboxgl.accessToken = MAPBOX_CONFIG.publicToken;
+  useEffect(() => {
+    if (!mapContainer.current || map.current || !mapboxToken) return;
+
+    mapboxgl.accessToken = mapboxToken;
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -31,7 +53,7 @@ export const VenueMap = ({ hoveredVenueId, onMarkerHover, language }: VenueMapPr
 
     map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-    map.current.on("load", () => {``
+    map.current.on("load", () => {
       venues.forEach((venue) => {
         const el = document.createElement("div");
         el.className = "venue-marker";
@@ -85,7 +107,7 @@ export const VenueMap = ({ hoveredVenueId, onMarkerHover, language }: VenueMapPr
     return () => {
       map.current?.remove();
     };
-  }, [language, onMarkerHover]);
+  }, [language, onMarkerHover, mapboxToken]);
 
   useEffect(() => {
     if (!isMapReady) return;
@@ -119,7 +141,12 @@ export const VenueMap = ({ hoveredVenueId, onMarkerHover, language }: VenueMapPr
 
   return (
     <div className="relative w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-lg">
-      {!isMapReady && (
+      {!mapboxToken && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-20">
+          <div className="text-center">Mapbox token required.</div>
+        </div>
+      )}
+      {!isMapReady && mapboxToken && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
