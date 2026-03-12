@@ -1,3 +1,3 @@
 export const MAPBOX_CONFIG = {
-  publicToken: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+  publicToken: import.meta.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "",
 };
